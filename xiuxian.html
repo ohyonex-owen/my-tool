@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>修仙套裝</title>
+<style>
+  :root{--g1:#1f5a36;--g2:#3c9a5c;--gold:#ffd54a;--bg:#0f2418}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
+  body{margin:0;background:var(--bg);color:#eafff0;font-family:"PingFang TC","Noto Sans TC",sans-serif;display:flex;justify-content:center}
+  #app{width:100%;max-width:480px;min-height:100vh;display:flex;flex-direction:column}
+  #top{display:flex;justify-content:space-between;padding:8px 12px;background:#0a1a11;font-size:14px}
+  #stage{position:relative;height:42vh;min-height:260px;background:linear-gradient(#7fb8a0 0%,#a8d3b4 55%,#2d5a3c 55%,#1c3d29 100%);overflow:hidden}
+  canvas{width:100%;height:100%;display:block}
+  #title{position:absolute;top:6px;left:0;right:0;text-align:center;font-weight:900;font-size:18px;color:#fff;text-shadow:0 2px 0 #1f5a36,0 0 8px #1f5a36}
+  .bar{height:10px;background:#0006;border-radius:5px;overflow:hidden;border:1px solid #0008}
+  .bar>i{display:block;height:100%;transition:width .15s}
+  #bars{position:absolute;left:10px;right:10px;bottom:6px;display:flex;gap:10px}
+  #bars>div{flex:1}
+  #hpP{background:#58d27a}#hpE{background:#e0534b}
+  #panel{flex:1;background:linear-gradient(#2c7a48,#1f5a36);border-top:4px solid #8fd6a4;padding:10px;display:flex;flex-direction:column;gap:8px}
+  h2{margin:0;text-align:center;font-size:18px;letter-spacing:4px;color:#e9ffd9}
+  #info{display:flex;gap:8px}
+  .box{flex:1;background:#0b2a1a99;border:2px solid #8fd6a4;border-radius:10px;padding:6px 8px;font-size:12px;line-height:1.5}
+  .box b{color:var(--gold)}
+  #grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+  .slot{aspect-ratio:1;border-radius:8px;border:2px solid #fff4;background:#143a25;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:26px;cursor:pointer}
+  .slot small{font-size:10px;opacity:.9}
+  .slot .el{position:absolute;top:2px;left:3px;font-size:11px;font-weight:700;border-radius:4px;padding:0 3px;color:#fff}
+  .slot.木{background:#1f6b3c}.slot.火{background:#8a3a1f}.slot.水{background:#1f4f8a}.slot.金{background:#8a7a1f}.slot.土{background:#6b4a2a}
+  .slot:active{transform:scale(.94)}
+  #btns{display:flex;gap:8px}
+  button{flex:1;padding:12px;font-size:15px;font-weight:800;border:0;border-radius:10px;background:var(--gold);color:#3a2a00;cursor:pointer}
+  button:disabled{opacity:.45}
+  button.alt{background:#8fd6a4;color:#0b3a1f}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="top"><span>第 <b id="wave">1</b> 關</span><span>💰 <b id="gold">0</b></span><span>戰力 <b id="power">0</b></span></div>
+  <div id="stage"><div id="title">邪雷再生流 — 邪雷修 木修 —</div><canvas id="cv"></canvas>
+    <div id="bars"><div class="bar"><i id="hpP" style="width:100%"></i></div><div class="bar"><i id="hpE" style="width:100%"></i></div></div></div>
+  <div id="panel">
+    <h2>木 修 套 裝</h2>
+    <div id="info"><div class="box" id="skills"></div><div class="box" id="sets"></div></div>
+    <div id="grid"></div>
+    <div id="btns"><button id="draw">🎁 抽裝備 (<span id="drawCost">30</span>)</button><button id="up" class="alt">⬆ 強化最弱</button></div>
+  </div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const ELS=['木','火','水','金','土'];
+const ECOL={木:'#58d27a',火:'#ff8a4a',水:'#5aa8ff',金:'#ffd54a',土:'#c89a6a'};
+const TYPES=[
+  {n:'劍',i:'🗡️',s:'atk'},{n:'御',i:'🛡️',s:'def'},{n:'異',i:'🌀',s:'life'},{n:'所',i:'📿',s:'thorn'},
+  {n:'劍',i:'⚔️',s:'atk'},{n:'御',i:'🪖',s:'def'},{n:'異',i:'🔮',s:'life'},{n:'所',i:'🪬',s:'thorn'},
+  {n:'劍',i:'🏹',s:'atk'},{n:'御',i:'🥋',s:'def'},{n:'異',i:'🧿',s:'life'},{n:'所',i:'📜',s:'thorn'}];
+const S={wave:1,gold:60,items:TYPES.map((t,i)=>({el:i<3?'木':ELS[i%5],lv:1})),
+  pHp:0,eHp:0,eMax:0,pMax:0,t:0,pT:0,eT:0,cdWY:0,cdSJ:0,fx:[],shake:0,drawN:0};
+
+function stats(){
+  const r={atk:10,def:0,life:0,thorn:0};
+  S.items.forEach((it,i)=>{const v=it.lv*(TYPES[i].s==='atk'?6:TYPES[i].s==='def'?3:TYPES[i].s==='life'?1.5:4);r[TYPES[i].s]+=v});
+  const cnt={};S.items.forEach(it=>cnt[it.el]=(cnt[it.el]||0)+1);
+  r.cnt=cnt;
+  const w=cnt['木']||0;
+  r.lifePct=r.life/100+(w>=4?.15:0)+(w>=8?.25:0);       // 吸血
+  r.thornMul=1+r.thorn/20+(w>=6?1:0);                    // 反傷倍率
+  r.thornPct=.4*r.thornMul;
+  r.atkMul=1+(w>=2?.2:0)+((cnt['火']||0)>=4?.5:0);
+  r.hpMax=200+r.def*10+(cnt['水']>=4?300:0);
+  r.power=Math.round(r.atk*r.atkMul+r.def*3+r.thorn*4+r.life*5);
+  return r;
+}
+function spawn(){
+  S.eMax=S.eHp=Math.round(120*Math.pow(1.28,S.wave-1));
+  const st=stats();S.pMax=st.hpMax;S.pHp=Math.min(S.pHp||S.pMax,S.pMax);
+  if(S.wave===1)S.pHp=S.pMax;
+}
+function fx(txt,x,y,c,big){S.fx.push({txt,x,y,c,big,t:0})}
+function hit(){ // 玩家攻擊
+  const st=stats();const crit=Math.random()<.2;
+  const d=Math.round(st.atk*st.atkMul*(crit?2:1)*(.9+Math.random()*.2));
+  S.eHp-=d;fx((crit?'暴擊 ':'-')+d,300,90,crit?'#ffd54a':'#fff',crit);
+  if(st.lifePct>0){const h=Math.round(d*st.lifePct);S.pHp=Math.min(S.pMax,S.pHp+h);if(h>0)fx('吸血 +'+h,70,70,'#58d27a')}
+}
+function skills(dt){
+  const st=stats();S.cdWY-=dt;S.cdSJ-=dt;
+  if(S.cdWY<=0){S.cdWY=4;const d=Math.round(st.atk*st.atkMul*3);S.eHp-=d;fx('無影 -'+d,280,60,'#9ef0ff',true);S.shake=8}
+  if(S.cdSJ<=0&&S.pHp<S.pMax*.8){S.cdSJ=6;const h=Math.round(S.pMax*.2);S.pHp=Math.min(S.pMax,S.pHp+h);fx('生機 +'+h,90,100,'#8fff8f',true)}
+}
+function enemyAtk(){
+  const st=stats();
+  const raw=Math.round(8*Math.pow(1.25,S.wave-1));
+  const d=Math.max(1,raw-Math.round(st.def*.6));
+  S.pHp-=d;fx('-'+d,90,120,'#ff6a6a');
+  const th=Math.round(d*st.thornPct*(1+S.wave*.0)+st.thorn*2);
+  if(th>0){S.eHp-=th;fx('反傷 -'+th,290,120,'#ff9ad0',true);S.shake=10}
+}
+function win(){
+  const g=Math.round(25*Math.pow(1.2,S.wave-1));S.gold+=g;fx('+'+g+'💰',200,60,'#ffd54a',true);
+  S.wave++;spawn();
+}
+function lose(){S.wave=Math.max(1,S.wave-1);S.pHp=0;spawn();S.pHp=S.pMax;fx('戰敗 退回上一關',200,100,'#fff',true)}
+
+let last=performance.now();
+function loop(now){
+  const dt=Math.min(.1,(now-last)/1000);last=now;S.t+=dt;
+  S.pT+=dt;S.eT+=dt;
+  if(S.pT>=.6){S.pT=0;hit()}
+  if(S.eT>=1){S.eT=0;enemyAtk()}
+  skills(dt);
+  if(S.eHp<=0)win();else if(S.pHp<=0)lose();
+  S.fx.forEach(f=>f.t+=dt);S.fx=S.fx.filter(f=>f.t<1);S.shake*=.85;
+  draw(now);ui();requestAnimationFrame(loop);
+}
+const cv=$('cv'),ctx=cv.getContext('2d');
+function draw(now){
+  const W=cv.width=cv.clientWidth*2,H=cv.height=cv.clientHeight*2;
+  ctx.setTransform(W/400,0,0,H/260,0,0);
+  const sx=(Math.random()-.5)*S.shake,sy=(Math.random()-.5)*S.shake;ctx.translate(sx,sy);
+  ctx.textAlign='center';
+  // 鳥居
+  ctx.fillStyle='#b8453a';ctx.fillRect(170,70,8,100);ctx.fillRect(222,70,8,100);ctx.fillRect(150,62,100,10);ctx.fillRect(160,82,80,6);
+  const bob=Math.sin(now/200)*3;
+  ctx.font='44px serif';
+  ctx.fillText('🧙‍♀️',50,160+bob);ctx.fillText('🥷',100,175-bob);ctx.fillText('🧝‍♀️',150,165+bob);
+  const atkAnim=S.pT<.15?20*(1-S.pT/.15):0;
+  ctx.font='90px serif';ctx.fillText(S.wave%5===0?'🐉':'👹',320-atkAnim*0+Math.sin(now/300)*4,185);
+  // 特效
+  S.fx.forEach(f=>{ctx.globalAlpha=1-f.t;ctx.font=(f.big?'900 26px':'900 18px')+' sans-serif';ctx.lineWidth=4;ctx.strokeStyle='#000a';ctx.strokeText(f.txt,f.x,f.y-f.t*50);ctx.fillStyle=f.c;ctx.fillText(f.txt,f.x,f.y-f.t*50)});
+  ctx.globalAlpha=1;
+}
+function ui(){
+  const st=stats();
+  $('wave').textContent=S.wave;$('gold').textContent=S.gold;$('power').textContent=st.power;
+  $('hpP').style.width=Math.max(0,S.pHp/S.pMax*100)+'%';$('hpE').style.width=Math.max(0,S.eHp/S.eMax*100)+'%';
+  $('skills').innerHTML='<b>共鳴神通</b><br>無影 '+Math.round(st.atk*st.atkMul*3)+' 傷害<br>生機 回復 20% 氣血';
+  const w=st.cnt['木']||0;
+  $('sets').innerHTML='<b>木修 '+w+'/12</b><br>'+[[2,'攻擊 +20%'],[4,'吸血 +15%'],[6,'反傷 ×2'],[8,'吸血 +25%']].map(([n,t])=>(w>=n?'✅':'⬜')+n+'件 '+t).join('<br>');
+  $('drawCost').textContent=drawCost();
+  $('draw').disabled=S.gold<drawCost();$('up').disabled=S.gold<upCost();
+  $('up').textContent='⬆ 強化最弱 ('+upCost()+')';
+}
+const drawCost=()=>30+S.drawN*8,upCost=()=>{const m=Math.min(...S.items.map(i=>i.lv));return 15*m+10};
+function render(){
+  $('grid').innerHTML='';
+  S.items.forEach((it,i)=>{
+    const d=document.createElement('div');d.className='slot '+it.el;
+    d.innerHTML=`<span class="el" style="background:${ECOL[it.el]}">${it.el}</span>${TYPES[i].i}<small>Lv.${it.lv}</small>`;
+    d.onclick=()=>{const c=15*it.lv+10;if(S.gold>=c){S.gold-=c;it.lv++;render()}};
+    $('grid').appendChild(d);
+  });
+}
+$('draw').onclick=()=>{
+  const c=drawCost();if(S.gold<c)return;S.gold-=c;S.drawN++;
+  const i=Math.floor(Math.random()*12);
+  const el=Math.random()<.5?'木':ELS[Math.floor(Math.random()*5)];
+  const old=S.items[i];S.items[i]={el,lv:old.lv+(el==='木'?1:0)};
+  fx('獲得 '+el+'屬'+TYPES[i].n,200,90,ECOL[el],true);render();
+};
+$('up').onclick=()=>{
+  const m=Math.min(...S.items.map(i=>i.lv)),c=upCost();if(S.gold<c)return;
+  S.gold-=c;S.items.find(i=>i.lv===m).lv++;render();
+};
+spawn();render();requestAnimationFrame(loop);
+</script>
+</body>
+</html>
