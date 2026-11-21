@@ -1,0 +1,175 @@
+<title>茶園物語</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@600;900&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+/* 佈局：頂部狀態列 → 四塊茶田 → 製茶台 → 茶行櫃台 → 訊息欄 */
+:root{--bg:#eef0e4;--panel:#fbfbf4;--fg:#1f2a1c;--mute:#5c6b57;--line:#cfd6bd;--tea:#3f6b3a;--tea2:#2a4a27;--soil:#8a6a4a;--gold:#b7791f;--bad:#a8402f;--font-d:"Noto Serif TC",serif;--font-b:"Noto Sans TC",system-ui,sans-serif}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#141a12;--panel:#1d261a;--fg:#e8eddc;--mute:#9bab93;--line:#33402e;--tea:#7fb36f;--tea2:#a6d697;--soil:#b08a62;--gold:#e0a64a;--bad:#e07a66;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#141a12;--panel:#1d261a;--fg:#e8eddc;--mute:#9bab93;--line:#33402e;--tea:#7fb36f;--tea2:#a6d697;--soil:#b08a62;--gold:#e0a64a;--bad:#e07a66;color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-b);padding-block:16px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:620px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+h1{font-family:var(--font-d);font-weight:900;font-size:1.7rem;margin:0;text-wrap:balance}
+.sub{color:var(--mute);margin:2px 0 0;font-size:.9rem}
+.top{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 10px;min-width:0}
+.stat b{display:block;font-size:1.25rem;font-variant-numeric:tabular-nums}
+.stat span{font-size:.75rem;color:var(--mute);letter-spacing:.06em}
+section{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:10px}
+h2{font-family:var(--font-d);font-size:1.05rem;margin:0}
+h2 small{font-family:var(--font-b);font-weight:400;color:var(--mute);font-size:.8rem;margin-left:6px}
+.plots{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.plot{aspect-ratio:1;min-width:0;border:2px solid var(--soil);border-radius:6px;background:color-mix(in srgb,var(--soil) 22%,var(--panel));color:var(--fg);font:inherit;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:4px}
+.plot:hover{filter:brightness(1.06)}
+.plot .t{font-size:.8rem;font-weight:700}
+.plot svg{width:34px;height:34px}
+.bar{width:80%;height:5px;background:var(--line);border-radius:3px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--tea)}
+.plot.ready{border-color:var(--tea);background:color-mix(in srgb,var(--tea) 25%,var(--panel))}
+button{font:inherit;font-weight:700;border:0;border-radius:6px;padding:10px 14px;background:var(--tea);color:#fff;cursor:pointer}
+button.alt{background:var(--gold)}
+button:disabled{opacity:.4;cursor:not-allowed}
+button:focus-visible,.plot:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.row p{margin:0;color:var(--mute);font-size:.88rem;flex:1 1 160px}
+.meter{position:relative;height:34px;background:var(--line);border-radius:6px;overflow:hidden}
+.zone{position:absolute;top:0;bottom:0;background:color-mix(in srgb,var(--tea) 35%,transparent)}
+.zone.p{background:color-mix(in srgb,var(--gold) 55%,transparent)}
+.mark{position:absolute;top:0;bottom:0;width:4px;background:var(--fg);left:0}
+.log{min-height:3.2em;line-height:1.6;font-size:.95rem}
+.log div:first-child{font-weight:700}
+.log div:not(:first-child){color:var(--mute)}
+.intro{border-left:3px solid var(--tea);padding:2px 0 2px 12px;color:var(--mute);font-size:.9rem;line-height:1.7}
+[hidden]{display:none!important}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>茶園物語</h1>
+    <p class="sub">種 → 採 → 製 → 賣　試作版</p>
+  </header>
+  <div class="intro">山霧未散，荒地一片。阿公留下的，只有一把舊茶鏟和一包茶籽。這一季，你要讓這座山，再次飄出茶香。</div>
+
+  <div class="top">
+    <div class="stat"><span>銀兩</span><b id="coin">40</b></div>
+    <div class="stat"><span>茶青</span><b id="leaf">0</b></div>
+    <div class="stat"><span>成茶</span><b id="tea">0</b></div>
+    <div class="stat"><span>稱號</span><b id="rank" style="font-size:.95rem;padding-top:4px">茶園新手</b></div>
+  </div>
+
+  <section>
+    <h2>1　茶田<small>一粒茶籽，一個夢（種子 5 銀）</small></h2>
+    <div class="plots" id="plots"></div>
+  </section>
+
+  <section>
+    <h2>2　製茶<small>火候差一分，味道差一截</small></h2>
+    <div class="row">
+      <p>3 份茶青換 1 盒茶。移動的指針停在金色區，就是上品。</p>
+      <button id="make">開始炒青</button>
+    </div>
+    <div id="game" hidden>
+      <div class="meter" id="meter"><div class="zone" id="zg"></div><div class="zone p" id="zp"></div><div class="mark" id="mark"></div></div>
+      <div class="row" style="margin-top:8px"><button id="stop" class="alt">停火！</button></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>3　茶行<small>好茶不怕巷子深</small></h2>
+    <div class="row">
+      <p id="shelf">架上沒有茶。</p>
+      <button id="sell" disabled>賣一盒</button>
+    </div>
+  </section>
+
+  <section class="log" id="log"><div>清晨的山很安靜。點一塊茶田，種下第一粒茶籽。</div></section>
+</div>
+
+<script>
+(function(){
+  var coin=40, leaf=0, earned=0, shelf=[]; // shelf: {q:0..2}
+  var plots=[0,1,2,3].map(function(){return {s:0,t:0}}); // s:0空 1長 2可採
+  var GROW=7000, QN=["普通","好茶","上品"], MULT=[1,1.4,2];
+  var RANKS=[[0,"茶園新手"],[80,"採茶達人"],[250,"製茶師傅"],[600,"茶行老闆"],[1200,"茶王"]];
+  var CUST=["阿嬤說：「這杯回甘，像小時候的味道。」","外地客人說：「再來一杯！」","茶評師點頭：「香氣很乾淨。」","小孩說：「不苦欸。」","老闆娘說：「這盒我要送人。」"];
+  var $=function(i){return document.getElementById(i)};
+  var logEl=$("log"), plotsEl=$("plots");
+
+  var LEAF='<svg viewBox="0 0 40 40" fill="none"><path d="M20 36V18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><path d="M20 22C10 22 7 14 7 8c8 0 13 4 13 14Z" fill="currentColor"/><path d="M20 18c0-8 5-12 13-12 0 7-4 12-13 12Z" fill="currentColor"/></svg>';
+  var SEED='<svg viewBox="0 0 40 40"><ellipse cx="20" cy="26" rx="6" ry="8" fill="currentColor"/></svg>';
+
+  function say(m){
+    var d=document.createElement("div"); d.textContent=m; logEl.insertBefore(d,logEl.firstChild);
+    while(logEl.children.length>4) logEl.removeChild(logEl.lastChild);
+  }
+  function rank(){var r=RANKS[0][1];RANKS.forEach(function(x){if(earned>=x[0])r=x[1]});return r}
+  function ui(){
+    $("coin").textContent=coin; $("leaf").textContent=leaf; $("tea").textContent=shelf.length;
+    var old=$("rank").textContent, r=rank(); $("rank").textContent=r;
+    if(old!==r) say("升級！你現在是「"+r+"」。");
+    $("make").disabled=leaf<3||playing;
+    $("sell").disabled=!shelf.length;
+    if(shelf.length){var c=[0,0,0];shelf.forEach(function(x){c[x.q]++});
+      $("shelf").textContent="架上："+c.map(function(n,i){return n?QN[i]+"×"+n:""}).filter(Boolean).join("、");
+    }else $("shelf").textContent="架上沒有茶。";
+  }
+  function draw(){
+    plotsEl.innerHTML="";
+    plots.forEach(function(p,i){
+      var b=document.createElement("button"); b.className="plot"+(p.s===2?" ready":"");
+      var h="";
+      if(p.s===0) h='<span style="color:var(--soil)">'+SEED+'</span><span class="t">種茶</span>';
+      else if(p.s===1){var pc=Math.min(100,(Date.now()-p.t)/GROW*100);
+        h='<span style="color:var(--tea);opacity:.6">'+LEAF+'</span><div class="bar"><i style="width:'+pc+'%"></i></div>';}
+      else h='<span style="color:var(--tea)">'+LEAF+'</span><span class="t">採茶</span>';
+      b.innerHTML=h; b.setAttribute("aria-label","茶田 "+(i+1));
+      b.onclick=function(){tap(i)}; plotsEl.appendChild(b);
+    });
+  }
+  function tap(i){
+    var p=plots[i];
+    if(p.s===0){ if(coin<5){say("銀兩不夠買茶籽，先賣點茶吧。");return}
+      coin-=5;p.s=1;p.t=Date.now();say("種下了。耐心是最好的肥料。");}
+    else if(p.s===2){p.s=0;leaf+=3;say("一心二葉，清晨最香。茶青 +3。");}
+    ui();draw();
+  }
+  setInterval(function(){
+    var ch=false;
+    plots.forEach(function(p){if(p.s===1&&Date.now()-p.t>=GROW){p.s=2;ch=true}});
+    if(ch)say("有茶田可以採了！");
+    draw();
+  },300);
+
+  // 製茶小遊戲
+  var playing=false, raf=0, pos=0, dir=1, zg, zp, speed;
+  $("make").onclick=function(){
+    if(leaf<3)return; playing=true; $("game").hidden=false; $("make").disabled=true;
+    var w=22+Math.random()*6, s=Math.random()*(100-w);
+    zg={a:s,b:s+w}; zp={a:s+w/2-4,b:s+w/2+4};
+    $("zg").style.left=zg.a+"%";$("zg").style.width=w+"%";
+    $("zp").style.left=zp.a+"%";$("zp").style.width="8%";
+    pos=0;dir=1;speed=1.1+earned/1500; var last=performance.now();
+    (function loop(t){
+      pos+=dir*speed*(t-last)/16; last=t;
+      if(pos>=100){pos=100;dir=-1}else if(pos<=0){pos=0;dir=1}
+      $("mark").style.left="calc("+pos+"% - "+pos/100*4+"px)";
+      raf=requestAnimationFrame(loop);
+    })(last);
+  };
+  $("stop").onclick=function(){
+    if(!playing)return; cancelAnimationFrame(raf); playing=false; $("game").hidden=true;
+    leaf-=3; var q=-1;
+    if(pos>=zp.a&&pos<=zp.b)q=2; else if(pos>=zg.a&&pos<=zg.b)q=1;
+    if(q<0){q=0;say("火候偏了，只是普通茶。")}
+    else say(q===2?"火候剛好！上品茶出爐。":"炒得不錯，是一盒好茶。");
+    shelf.push({q:q}); ui();
+  };
+
+  $("sell").onclick=function(){
+    var t=shelf.shift(), g=Math.round(20*MULT[t.q]);
+    coin+=g; earned+=g; say("賣出一盒"+QN[t.q]+"，+"+g+" 銀。");
+    say(CUST[Math.floor(Math.random()*CUST.length)]); ui();
+    if(earned>=1200&&!window.__won){window.__won=1;say("當第一位客人說「再來一杯」，你知道，這座山又活了。")}
+  };
+  ui();draw();
+})();
+</script>
